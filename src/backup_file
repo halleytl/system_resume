@@ -1,0 +1,8 @@
+#!/bin/sh 
+
+date=`date +"%Y%m%d%H%M"`
+mount_dir=/mnt
+device=/dev/sda1
+mount ${device} ${mount_dir}
+cd $mount_dir
+tar -zcvpf /cdrom/backup${date}.tar.gz `ls`

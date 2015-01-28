@@ -1,0 +1,68 @@
+#!/bin/sh
+
+#author :huanglei <huanglei@jia.do>
+
+prefix=/root/resume_robot
+config=$prefix/config
+device=/dev/sda
+fstab=$config/fstab
+grub=$config/grub.cfg
+file_system=/cdrom/backup.tar.gz
+#file_system=$prefix/filesystem.squashfs
+mbr=$config/mbr
+parted=$config/parted.bak
+mount_dir=/mnt
+
+if [ `id -u` != 0 ];then
+    echo "Need to be root"
+    exit 1
+fi
+
+flag=0 # success
+for file in $device $fstab $grub $file_system $mbr $parted
+do
+    if [ -e $file ];then
+        echo -n "[yes]\t"
+    else
+        echo -n "[no] \t"
+        flag=1
+    fi
+    echo  "$file"
+done
+
+if [ $flag=="0" ];then
+    echo "missing files!"
+    exit 1
+fi
+#1.恢复分区表
+echo "1.创建分区表"
+dd if=$mbr of=$device bs=512 count=1
+sfdisk --force $device < $parted
+echo "将${device}1 设备格式化(ext4)"
+mkfs.ext4 ${device}1
+
+echo "2.挂载设备(${device}1)到$mount_dir目录"
+#2.挂载设备到/mnt目录
+mount ${device}1 $mount_dir
+
+echo "3.解压系统到/mnt目录"
+#3.解压系统到/mnt目录
+tar zxvfp $file_system -C $mount_dir
+#unsquashfs $file_system -d $mount_dir
+#其他处理
+    #删除文件/etc/udev/rules.d/70-persistent-net.rules
+    echo "清空网络设备基本配置"
+    echo "">/etc/udev/rules.d/70-persistent-net.rules
+    #替换fstab文件
+    echo "替换fstab文件"
+    cp -ap $fstab $mount_dir/etc/fstab
+    #替换grub文件
+    echo "替换grub文件"
+    cp -ap $grub $mount_dir/boot/grub/grub.cfg
+echo "4.弹出设备"
+#4.弹出设备
+umount $mount_dir
+#5.系统重启
+echo "5.系统重启"
+reboot
+
